@@ -2,11 +2,10 @@
 #include <SensirionI2cStcc4.h>
 #include <Wire.h>
 #include <Preferences.h>
+Preferences preferences;
 
 // Configuration
-//#define ENABLE_WEBSERVER_WITHOUT_MYAM
 //#define ENABLE_SERIAL_PRINTS
-#define ENABLE_MYAM
 //#define MYAM_LED_COLORS
 
 SensirionI2cStcc4 sensor;
@@ -15,13 +14,11 @@ float temperature = 0.0f;
 float humidity = 0.0f;
 uint16_t sensorStatus = 0;
 static int64_t lastMeasurementTimeMs = 0;
-//bool USB_ACTIVE = false;
 
 #define BUTTON GPIO_NUM_0
 #define SCL GPIO_NUM_13
 #define SDA GPIO_NUM_12
 #define LED GPIO_NUM_6
-//#define LED GPIO_NUM_21
 
 //  MYAM_LED_COLORS
 #define CO2_THRES_DANGER 1600 
@@ -34,37 +31,26 @@ FirmwareMSC MSC_Update;
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(1, LED, NEO_GRB + NEO_KHZ800);  // numLEDs, PIN
 
-
-#ifdef ENABLE_WEBSERVER_WITHOUT_MYAM
 #include <WiFi.h>
-#include <WebServer.h>
-const int port = 9925;
-WebServer server(port);
-bool initDone = false;
-#endif
-
-
-#ifdef ENABLE_MYAM
-#include "Sensirion_Gadget_BLE.h"
-#include "WifiMultiLibraryWrapper.h"
-NimBLELibraryWrapper lib;
-WifiMultiLibraryWrapper wifi;
-DataProvider provider(lib, DataType::T_RH_CO2_ALT, true, false, true, &wifi);
-//                enableWifiSettings,enableBatteryService,enableFRCService
+#include "FrcBleService.h"
+#include "SensirionUptBleServer.h"
+#include "SettingsBleService.h"
+using namespace sensirion::upt;
+ble_server::NimBLELibraryWrapper lib;
+ble_server::SettingsBleService settingsBleService(lib);
+ble_server::FrcBleService frcBleService(lib);
+ble_server::UptBleServer uptBleServer(lib, core::T_RH_CO2_ALT);
+bool frcRequested = false;
+int16_t reference_co2_level;
 
 #include <WebServer.h>
 const int port = 9925;
 WebServer server(port);
 bool initDone = false;
-#endif /* ENABLE_MYAM */
 
 float getTemperatureOffset() {
-#ifdef ENABLE_MYAM
-  if (WiFi.status() == WL_CONNECTED) return -12.2f;  // || USB_ACTIVE
-  else return -4.2f;
-#else
-  return -7.0f;
-#endif
+  if (WiFi.status() == WL_CONNECTED) return -15.0f;
+  else return -7.0f;
 }
 
 void setLED(uint16_t co2) {
@@ -128,7 +114,6 @@ void blinkLedGreenThenBackToBlue() {
   pixels.show();
 }
 
-#if defined(ENABLE_MYAM) || defined(ENABLE_WEBSERVER_WITHOUT_MYAM)
 String GenerateMetrics() {
   String message = "";
   String idString = "{id=\"" + String("Open CO2 Mini") + "\",mac=\"" + WiFi.macAddress().c_str() + "\"}";
@@ -159,7 +144,6 @@ String GenerateMetrics() {
 void HandleRoot() {
   server.send(200, "text/plain", GenerateMetrics());
 }
-#endif /* ENABLE_MYAM */
 
 float calculateHumidityOffset(float temperature, float humidity) {
   float T2 = temperature + getTemperatureOffset();
@@ -169,14 +153,12 @@ float calculateHumidityOffset(float temperature, float humidity) {
   return humidity * exp(m * Tn * ((temperature - T2) / ((Tn + temperature) * (Tn + T2))));
 }
 
-#if defined(ENABLE_MYAM) || defined(ENABLE_WEBSERVER_WITHOUT_MYAM)
 void initOnce() {
   server.on("/", HandleRoot);
   server.on("/metrics", HandleRoot);
   server.begin();
   initDone = true;
 }
-#endif /* ENABLE_MYAM */
 
 void rainbowMode() {
   for (int j = 0; j < 256; j++) {
@@ -213,31 +195,8 @@ void setup() {
   pixels.setPixelColor(0, pixels.Color(0, 0, 255));
   pixels.show();
 
-#ifdef ENABLE_MYAM
-  WiFi.setHostname("OpenCO2mini");  // hostname when connected to home network
-  provider.enableAltDeviceName();
-  provider.begin();
-
-  Preferences preferences;
-  preferences.begin("ble", true);
-  provider.setAltDeviceName(preferences.getString("altname", "OpenCO2 Mini").c_str());
-  preferences.end();
-  
-  wifi.loadCredentials();
-#ifdef ENABLE_SERIAL_PRINTS
-  Serial.print("Sensirion GadgetBle Lib initialized with deviceId = ");
-  Serial.println(provider.getDeviceIdString());
-#endif /* ENABLE_SERIAL_PRINTS */
-#endif /* ENABLE_MYAM */
-
   Wire.begin(SDA, SCL);
   sensor.begin(Wire, STCC4_I2C_ADDR_64);
-
-#ifdef ENABLE_WEBSERVER_WITHOUT_MYAM
-  WiFi.mode(WIFI_STA);
-  WiFi.begin("ssid", "password");
-  initOnce();
-#endif
 
   uint16_t error;
   // stop potentially previously started measurement
@@ -288,14 +247,28 @@ void setup() {
 
   Serial.println("Waiting for first measurement...");
 #endif /* ENABLE_SERIAL_PRINTS */
+
+  settingsBleService.setAltDeviceName("OpenCO2 Mini");
+  settingsBleService.registerWifiChangedCallback(onWifiChanged);
+  uptBleServer.registerBleServiceProvider(settingsBleService);
+
+  frcBleService.registerFrcRequestCallback(frcRequestCallback);
+  uptBleServer.registerBleServiceProvider(frcBleService);
+
+  uptBleServer.begin();
+
+  WiFi.setHostname("OpenCO2mini");  // hostname when connected to home network
+  loadCredentials();
+#ifdef ENABLE_SERIAL_PRINTS
+  Serial.print("Sensirion GadgetBle Lib initialized with deviceId = ");
+  //Serial.println(provider.getDeviceIdString());
+#endif /* ENABLE_SERIAL_PRINTS */
   delay(320);
 }
 
 void loop() {
   uint16_t error;
-#ifdef ENABLE_MYAM
   if (millis() - lastMeasurementTimeMs >= 1000) {
-#endif
     error = sensor.readMeasurement(co2, temperature, humidity, sensorStatus);
     if (error) {
 #ifdef ENABLE_SERIAL_PRINTS
@@ -333,79 +306,108 @@ void loop() {
         USB.begin();
         pixels.setPixelColor(0, pixels.Color(0, 0, 255));
         pixels.show();
-        while (digitalRead(BUTTON) == 0) delay(100);
+        int counter = 0;
+        while (digitalRead(BUTTON) == 0) {
+          delay(100);
+          counter++;
+          if (counter == 50) { // Press for 5 sec
+            pixels.setPixelColor(0, pixels.Color(255, 255, 255));
+            pixels.show();
+
+            preferences.begin("wifiCreds", false);
+            preferences.putString("ssid", "");
+            preferences.putString("pass", "");
+            preferences.end();
+
+            sensor.stopContinuousMeasurement();
+            uint16_t factoryResetResult;
+            sensor.performFactoryReset(factoryResetResult);
+            ESP.restart();
+            //sensor.startContinuousMeasurement();
+          }
+        }
         rainbowMode();
         setLED(co2);
         MSC_Update.end();
-
-        /*pixels.setPixelColor(0, pixels.Color(255, 255, 255));
-        pixels.show();
-        sensor.stopContinuousMeasurement();
-        sensor.performFactoryReset();
-        sensor.startContinuousMeasurement();
-        setLED(co2);*/
       }
 
-#ifdef ENABLE_MYAM
-      provider.writeValueToCurrentSample(co2, SignalType::CO2_PARTS_PER_MILLION);
-      provider.writeValueToCurrentSample(temperature, SignalType::TEMPERATURE_DEGREES_CELSIUS);
-      provider.writeValueToCurrentSample(humidity, SignalType::RELATIVE_HUMIDITY_PERCENTAGE);
-      provider.commitSample();
+      uptBleServer.writeValueToCurrentSample(co2, core::SignalType::CO2_PARTS_PER_MILLION);
+      uptBleServer.writeValueToCurrentSample(temperature, core::SignalType::TEMPERATURE_DEGREES_CELSIUS);
+      uptBleServer.writeValueToCurrentSample(humidity, core::SignalType::RELATIVE_HUMIDITY_PERCENTAGE);
+      uptBleServer.commitSample();
     }
   }
-#endif
 
-#ifdef ENABLE_WEBSERVER_WITHOUT_MYAM
-  server.handleClient();
-#endif
-
-#ifdef ENABLE_MYAM
-  if (wifi.isConnected()) {
-    if (!initDone) initOnce();
+  if (WiFi.status() == WL_CONNECTED) {
+    //if (!initDone) initOnce();
     server.handleClient();
-    //Serial.println(wifi.localIP());
   }
+  delay(70); //bad: 60 good: 80
 
-  delay(100);                                       //ok: 10 bad: 5
-  if (lib.getConnected() || wifi.isConnected()) {  //|| USB_ACTIVE
-    provider.handleDownload();
+  if (uptBleServer.hasConnectedDevices() || WiFi.status() == WL_CONNECTED){
+    uptBleServer.handleDownload();
     handleFrcRequest();
-    delay(20);
+    delay(500);
   } else {
 #ifdef ENABLE_SERIAL_PRINTS
-    delay(1985);
-    return;
-#else
-    esp_sleep_enable_timer_wakeup(1985 * 1000);  // 985*1000
-    esp_light_sleep_start();
-#endif /*ENABLE_SERIAL_PRINTS*/
-  }
-#endif /* ENABLE_MYAM */
-
-#if not defined(ENABLE_MYAM)
-  int ms = 1003;
-#if defined(ENABLE_SERIAL_PRINTS) || defined(ENABLE_WEBSERVER_WITHOUT_MYAM)
-  delay(ms);
+  delay(1003);
 #else  /* NOT ENABLE_SERIAL_PRINTS */
-  esp_sleep_enable_timer_wakeup(ms * 1000);
+  esp_sleep_enable_timer_wakeup(1985 * 1000);  // 985*1000
   esp_light_sleep_start();
 #endif /* ENABLE_SERIAL_PRINTS */
-#endif /* !ENABLE_MYAM */
+  }
 }
-#ifdef ENABLE_WEBSERVER_WITHOUT_MYAM
-}
+
+void onWifiChanged(const std::string &ssid, const std::string &pass) {
+  preferences.begin("wifiCreds", false);
+  preferences.putString("ssid", ssid.c_str());
+  preferences.putString("pass", pass.c_str());
+  preferences.end();
+
+#ifdef ENABLE_SERIAL_PRINTS
+  Serial.print("onWifiChanged added: ");
+  Serial.print(ssid.c_str());
+  Serial.print(" pass: ");
+  Serial.println(pass.c_str());
 #endif
 
-#ifdef ENABLE_MYAM
+  if (ssid.empty()) return;
+  WiFi.begin(ssid.c_str(), pass.c_str());
+  initOnce();
+}
+
+void loadCredentials() {
+  preferences.begin("wifiCreds", true);
+  String ssid = preferences.getString("ssid", "");
+  String pass = preferences.getString("pass", "");
+  preferences.end();
+
+  if (ssid == "") return;
+#ifdef ENABLE_SERIAL_PRINTS
+  Serial.print("loadCredentials ssid: ");
+  Serial.print(ssid);
+  Serial.print(" pass: ");
+  Serial.println(pass);
+#endif
+  WiFi.begin(ssid, pass);
+  initOnce();
+}
+
+void frcRequestCallback(const uint16_t u_reference_co2_level) {
+  frcRequested = true;
+  reference_co2_level = (int16_t)(u_reference_co2_level & 0x7FFF);
+#ifdef ENABLE_SERIAL_PRINTS
+  Serial.print("FRC Request received with referenceCo2Level = ");
+  Serial.println(reference_co2_level);
+#endif
+}
+
 void handleFrcRequest() {
-  if(!provider.isFRCRequested()) {
-    return;
-  }
+  if(!frcRequested) return;
   // Set LED to blue for user feedback
   pixels.setPixelColor(0, pixels.Color(0, 0, 255));
   pixels.show();
 
-  uint16_t reference_co2_level = provider.getReferenceCO2Level();
   #ifdef ENABLE_SERIAL_PRINTS
   char errorMessage[256];
   Serial.print("Performing FRC with CO2 reference level [ppm]: ");
@@ -424,7 +426,7 @@ void handleFrcRequest() {
     Serial.println("FRC could not be performed.");
     #endif
     blinkLedRedThenBackToBlue();
-    provider.completeFRCRequest();
+    frcRequested = false;
     return;
   }
   // Successfully stopped measurement
@@ -448,7 +450,7 @@ void handleFrcRequest() {
     delay(300);
   }
   
-  provider.completeFRCRequest();
+  frcRequested = false;
 
   error = sensor.startContinuousMeasurement();
   if (error) {
@@ -464,4 +466,3 @@ void handleFrcRequest() {
   
   delay(5000);
 }
-#endif
