@@ -16,17 +16,11 @@ jobs:
           platforms: |
             - name: esp32:esp32
               source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-              version: 3.3.2
+              version: 3.3.4
           libraries: |
             - name: Adafruit NeoPixel
             - name: Sensirion Core
-            - source-url: https://github.com/Sensirion/arduino-upt-core.git
-              version: 0.6.0
-              destination-name: Sensirion_UPT_Core
             - name: Sensirion I2C STCC4
-            - name: Sensirion Gadget BLE Arduino Lib
-            - source-url: https://github.com/davidkreidler/arduino-ble-gadget.git
-              version: 1.5.1
-              destination-name: Sensirion_Gadget_BLE_Arduino_Lib
+            - name: Sensirion UPT BLE Server
           sketch-paths: |
             - .
