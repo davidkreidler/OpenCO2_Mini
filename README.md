@@ -13,11 +13,13 @@ The OpenCO2 Mini features the Sensirion STCC4, CO2 Sensor and a SHT40 Sensor for
 * CO2 output range: 400 ppm – 5'000 ppm
 * Accuracy:
     * CO2 ±(100 ppm + 10% m.v.)
-    * Temperature ±0.2°C
+    * Temperature ±0.8°C
     * Humidity ±2%
 
 # RGB LED
-The color Led provides real-time readings of CO2 levels in a convinient trafic light pattern. Updates occur every few seconds for instant feedback, with low power draw enabling portable use.
+The color LED provides real-time readings of CO2 levels in a convenient traffic‑light pattern. Updates occur every few seconds for instant feedback, with low power draw enabling portable use.
+
+![alt text](https://github.com/davidkreidler/OpenCO2_Mini/raw/main/pictures/animation.gif)
 
 # Wi-Fi Connectivity
 Built-in 2.4GHz ESP32-S3 Wi-Fi allows for remote data access and integration. Connect to your home network for web-based monitoring or smart home compatibility.
@@ -51,11 +53,12 @@ rest:
 ```
 
 #  3D-Printed Housing
-Transparent with Ultra-compact size: ~2.7cm x 20cm for easy connection to every USB-C outlet.
+Transparent with ultra-compact size: ~1.5cm x 2.0cm for easy connection to every USB-C outlet.
+* [3D Model viewer](https://a360.co/47DaEof)
 ![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/side.png)
 
 # MyAmbience App Integration
-The Sensirion MyAmbience app (available for iOS and Android) brings your OpenCO2 Mini to life via Bluetooth, offering a user-friendly interface to view live CO2, temperature, and humidity data, plot historical trends, and export measurements. Download the app from the App Store or Google Play, enable Bluetooth on your phone, and scan for the OpenCO2 Mini inside the APP. It connects seamlessly for real-time monitoring on the go. To add WiFi connection credentials, open the app after pairing, navigate to the device settings menu, under "Gadget's WiFi Connection" add your WiFi network `Network Name (SSID)` and `Password`, and "Set Wifi Credentials". The OpenCO2 Mini will then join your home network for enhanced integrations like Home Assistant or remote access while maintaining Bluetooth functionality for mobile viewing.
+The Sensirion MyAmbience app (available for iOS and Android) brings your OpenCO2 Mini to life via Bluetooth Low Energy (BLE), offering a user-friendly interface to view live CO2, temperature, and humidity data, plot historical trends, and export measurements. Download the app from the App Store or Google Play, enable Bluetooth on your phone, and scan for the OpenCO2 Mini inside the app. It connects seamlessly for real-time monitoring on the go. To add WiFi connection credentials, open the app after pairing, navigate to the device settings menu, under "Gadget's WiFi Connection" add your WiFi network `Network Name (SSID)` and `Password`, and "Set Wifi Credentials". The OpenCO2 Mini will then join your home network for enhanced integrations like Home Assistant or remote access while maintaining Bluetooth functionality for mobile viewing.
 ![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/myAmbience.png)
 
 
@@ -86,14 +89,15 @@ Copy the file to the USB mass storage device.
 # Arduino IDE Installation
 [Install the ESP32-S3 support for Arduino IDE](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html)
 Choose `ESP32S3 Dev Module` under `Tools -> Board -> esp32`
-Connect the Sensor via USB-C while pressing the button and choose the new Port under `Tools -> Boards -> Port`
+Connect the Sensor via USB-C while pressing the button and choose the new Port under `Tools -> Port`
 
 # Dependencies
 * [Adafruit NeoPixel](https://github.com/adafruit/Adafruit_NeoPixel)
 * [Sensirion Core](https://github.com/Sensirion/arduino-core)
-* [Sensirion UPT Core 0.6.0](https://github.com/Sensirion/arduino-upt-core)
-* [Sensirion Gadget BLE Arduino Lib](https://github.com/Sensirion/arduino-ble-gadget)
+* [Sensirion UPT BLE Server](https://github.com/Sensirion/arduino-upt-ble-server)
 * [Sensirion I2C STCC4](https://github.com/Sensirion/arduino-i2c-stcc4)
 
 ![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/back.png)
+![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/flyer_1.png)
+![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/flyer_2.png)
 ![alt text](https://github.com/davidkreidler/OpenCO2_Mini/blob/main/pictures/schematic.png)
