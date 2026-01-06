@@ -342,7 +342,9 @@ void loop() {
     //if (!initDone) initOnce();
     server.handleClient();
   }
-  delay(70); //bad: 60 good: 80
+  delay(90); 
+  // Android bad: 60 good: 80
+  // iOS sometimes bad: 80 good: 90
 
   if (uptBleServer.hasConnectedDevices() || WiFi.status() == WL_CONNECTED){
     uptBleServer.handleDownload();
