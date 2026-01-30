@@ -32,9 +32,9 @@ FirmwareMSC MSC_Update;
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(1, LED, NEO_GRB + NEO_KHZ800);  // numLEDs, PIN
 
 #include <WiFi.h>
-#include "FrcBleService.h"
 #include "SensirionUptBleServer.h"
-#include "SettingsBleService.h"
+#include "bleServices/SettingsBleService.h"
+#include "bleServices/FrcBleService.h"
 using namespace sensirion::upt;
 ble_server::NimBLELibraryWrapper lib;
 ble_server::SettingsBleService settingsBleService(lib);
@@ -47,6 +47,8 @@ int16_t reference_co2_level;
 const int port = 9925;
 WebServer server(port);
 bool initDone = false;
+bool wifiGotDisconnected = false;
+unsigned long lastReconnectAttempt = 0;
 
 float getTemperatureOffset() {
   if (WiFi.status() == WL_CONNECTED) return -15.0f;
@@ -339,8 +341,14 @@ void loop() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    //if (!initDone) initOnce();
     server.handleClient();
+  } else if (wifiGotDisconnected){
+    unsigned long now = millis();
+    if (now - lastReconnectAttempt >= 15000) {
+      lastReconnectAttempt = now;
+      //WiFi.begin(ssid, pass);
+      WiFi.reconnect();
+    }
   }
   delay(90); 
   // Android bad: 60 good: 80
@@ -374,10 +382,15 @@ void onWifiChanged(const std::string &ssid, const std::string &pass) {
 #endif
 
   if (ssid.empty()) return;
-  WiFi.begin(ssid.c_str(), pass.c_str());
-  initOnce();
+  loadCredentials();
 }
 
+void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+  wifiGotDisconnected = true;
+}
+void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+    wifiGotDisconnected = false;
+}
 void loadCredentials() {
   preferences.begin("wifiCreds", true);
   String ssid = preferences.getString("ssid", "");
@@ -391,6 +404,8 @@ void loadCredentials() {
   Serial.print(" pass: ");
   Serial.println(pass);
 #endif
+  WiFi.onEvent(WiFiStationConnected,    ARDUINO_EVENT_WIFI_STA_CONNECTED);
+  WiFi.onEvent(WiFiStationDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.begin(ssid, pass);
   initOnce();
 }
