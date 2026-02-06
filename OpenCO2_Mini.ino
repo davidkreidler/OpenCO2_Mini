@@ -250,8 +250,12 @@ void setup() {
   Serial.println("Waiting for first measurement...");
 #endif /* ENABLE_SERIAL_PRINTS */
 
-  settingsBleService.setAltDeviceName("OpenCO2 Mini");
+  preferences.begin("wifiCreds", true);
+  const String name = preferences.getString("alt-device-name", "OpenCO2 Mini");
+  preferences.end();
+  settingsBleService.setAltDeviceName(name.c_str());
   settingsBleService.registerWifiChangedCallback(onWifiChanged);
+  settingsBleService.registerDeviceNameChangeCallback(nameChangeRequestCallback);
   uptBleServer.registerBleServiceProvider(settingsBleService);
 
   frcBleService.registerFrcRequestCallback(frcRequestCallback);
@@ -319,6 +323,7 @@ void loop() {
             preferences.begin("wifiCreds", false);
             preferences.putString("ssid", "");
             preferences.putString("pass", "");
+            preferences.putString("alt-device-name", "OpenCO2 Mini");
             preferences.end();
 
             sensor.stopContinuousMeasurement();
@@ -408,6 +413,12 @@ void loadCredentials() {
   WiFi.onEvent(WiFiStationDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.begin(ssid, pass);
   initOnce();
+}
+
+void nameChangeRequestCallback(const std::string &newName) {
+  preferences.begin("wifiCreds", false);
+  preferences.putString("alt-device-name", newName.c_str());
+  preferences.end();
 }
 
 void frcRequestCallback(const uint16_t u_reference_co2_level) {
