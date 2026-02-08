@@ -15,6 +15,8 @@ float humidity = 0.0f;
 uint16_t sensorStatus = 0;
 static int64_t lastMeasurementTimeMs = 0;
 
+#define FIRMWARE_VERSION "v1.4"
+
 #define BUTTON GPIO_NUM_0
 #define SCL GPIO_NUM_13
 #define SDA GPIO_NUM_12
@@ -35,10 +37,13 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(1, LED, NEO_GRB + NEO_KHZ800);  // 
 #include "SensirionUptBleServer.h"
 #include "bleServices/SettingsBleService.h"
 #include "bleServices/FrcBleService.h"
+#include "bleServices/DeviceInformationBleService.h"
 using namespace sensirion::upt;
+
 ble_server::NimBLELibraryWrapper lib;
 ble_server::SettingsBleService settingsBleService(lib);
 ble_server::FrcBleService frcBleService(lib);
+ble_server::DeviceInformationBleService deviceInfoService(lib);
 ble_server::UptBleServer uptBleServer(lib, core::T_RH_CO2_ALT);
 bool frcRequested = false;
 int16_t reference_co2_level;
@@ -257,6 +262,11 @@ void setup() {
   settingsBleService.registerWifiChangedCallback(onWifiChanged);
   settingsBleService.registerDeviceNameChangeCallback(nameChangeRequestCallback);
   uptBleServer.registerBleServiceProvider(settingsBleService);
+
+  deviceInfoService.setManufacturerName("davidkreidler");
+  deviceInfoService.setModelNumber("OpenCO2 Mini");
+  deviceInfoService.setFirmwareRevision(FIRMWARE_VERSION);
+  uptBleServer.registerBleServiceProvider(deviceInfoService);
 
   frcBleService.registerFrcRequestCallback(frcRequestCallback);
   uptBleServer.registerBleServiceProvider(frcBleService);
