@@ -53,6 +53,7 @@ const int port = 9925;
 WebServer server(port);
 bool initDone = false;
 bool wifiGotDisconnected = false;
+bool wifiConnectRequested = false;
 unsigned long lastReconnectAttempt = 0;
 
 float getTemperatureOffset() {
@@ -357,6 +358,9 @@ void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
+  } else if (wifiConnectRequested) {
+    wifiConnectRequested = false;
+    loadCredentials();
   } else if (wifiGotDisconnected){
     unsigned long now = millis();
     if (now - lastReconnectAttempt >= 15000) {
@@ -388,6 +392,7 @@ void onWifiChanged(const std::string &ssid, const std::string &pass) {
   preferences.putString("ssid", ssid.c_str());
   preferences.putString("pass", pass.c_str());
   preferences.end();
+  wifiConnectRequested = true;
 
 #ifdef ENABLE_SERIAL_PRINTS
   Serial.print("onWifiChanged added: ");
@@ -395,9 +400,6 @@ void onWifiChanged(const std::string &ssid, const std::string &pass) {
   Serial.print(" pass: ");
   Serial.println(pass.c_str());
 #endif
-
-  if (ssid.empty()) return;
-  loadCredentials();
 }
 
 void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -421,8 +423,10 @@ void loadCredentials() {
 #endif
   WiFi.onEvent(WiFiStationConnected,    ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(WiFiStationDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.disconnect(true);
+  delay(200);
   WiFi.begin(ssid, pass);
-  initOnce();
+  if (!initDone) initOnce();
 }
 
 void nameChangeRequestCallback(const std::string &newName) {
