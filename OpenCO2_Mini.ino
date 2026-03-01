@@ -57,8 +57,7 @@ bool wifiConnectRequested = false;
 unsigned long lastReconnectAttempt = 0;
 
 float getTemperatureOffset() {
-  if (WiFi.status() == WL_CONNECTED) return -15.0f;
-  else return -7.0f;
+  return (WiFi.status() == WL_CONNECTED) ? -15.0f : -7.0f;
 }
 
 void setLED(uint16_t co2) {
@@ -66,34 +65,20 @@ void setLED(uint16_t co2) {
 
 #ifdef MYAM_LED_COLORS
   if (co2 > CO2_THRES_DANGER) {
-    // Set LED to red
-    red = 255;
-    green = 0;
-    blue = 0;
-  } else if (co2 > CO2_THRES_WARN){
-    // Set LED to orange
-    red = 255;
-    green = 120;
-    blue = 0;
+    red = 255; green = 0; blue = 0;
+  } else if (co2 > CO2_THRES_WARN) {
+    red = 255; green = 120; blue = 0; // orange
   } else {
-    // Set LED to green
-    red = 0;
-    green = 255;
-    blue = 0;
+    red = 0; green = 255; blue = 0;
   }
 #else
   if (co2 > 2000) {
-    red = 216;
-    green = 2;
-    blue = 131;  // magenta
+    red = 216; green = 2; blue = 131; // magenta
   } else {
     red = pow((co2 - 400), 2) / 10000;
     green = -pow((co2 - 400), 2) / 4500 + 255;
-
-    if (red < 0) red = 0;
-    if (red > 255) red = 255;
-    if (green < 0) green = 0;
-    if (green > 255) green = 255;
+    red = constrain(red, 0, 255);
+    green = constrain(green, 0, 255);
   }
 #endif /*MYAM_LED_COLORS*/
 
@@ -123,31 +108,12 @@ void blinkLedGreenThenBackToBlue() {
 }
 
 String GenerateMetrics() {
-  String message = "";
-  String idString = "{id=\"" + String("Open CO2 Mini") + "\",mac=\"" + WiFi.macAddress().c_str() + "\"}";
-
-  message += "# HELP rco2 CO2 value, in ppm\n";
-  message += "# TYPE rco2 gauge\n";
-  message += "rco2";
-  message += idString;
-  message += String(co2);
-  message += "\n";
-
-  message += "# HELP atmp Temperature, in degrees Celsius\n";
-  message += "# TYPE atmp gauge\n";
-  message += "atmp";
-  message += idString;
-  message += String(temperature);
-  message += "\n";
-
-  message += "# HELP rhum Relative humidity, in percent\n";
-  message += "# TYPE rhum gauge\n";
-  message += "rhum";
-  message += idString;
-  message += String(humidity);
-  message += "\n";
-
-  return message;
+  String id = "{id=\"Open CO2 Mini\",mac=\"" + WiFi.macAddress() + "\"}";
+  String msg;
+  msg += "# HELP rco2 CO2 value, in ppm\n# TYPE rco2 gauge\nrco2" + id + String(co2) + "\n";
+  msg += "# HELP atmp Temperature, in degrees Celsius\n# TYPE atmp gauge\natmp" + id + String(temperature) + "\n";
+  msg += "# HELP rhum Relative humidity, in percent\n# TYPE rhum gauge\nrhum" + id + String(humidity) + "\n";
+  return msg;
 }
 void HandleRoot() {
   server.send(200, "text/plain", GenerateMetrics());
@@ -155,9 +121,7 @@ void HandleRoot() {
 
 float calculateHumidityOffset(float temperature, float humidity) {
   float T2 = temperature + getTemperatureOffset();
-  float m = 17.625f;
-  float Tn = 243.21f;
-
+  float m = 17.625f, Tn = 243.21f;
   return humidity * exp(m * Tn * ((temperature - T2) / ((Tn + temperature) * (Tn + T2))));
 }
 
@@ -173,13 +137,13 @@ void rainbowMode() {
     int red = 1, green = 0, blue = 0;
 
     if (j < 85) {
-      red = ((float)j / 85.0f) * 255.0f;
+      red = (j / 85.0f) * 255.0f;
       blue = 255 - red;
     } else if (j < 170) {
-      green = ((float)(j - 85) / 85.0f) * 255.0f;
+      green = ((j - 85) / 85.0f) * 255.0f;
       red = 255 - green;
-    } else if (j < 256) {
-      blue = ((float)(j - 170) / 85.0f) * 255.0f;
+    } else {
+      blue = ((j - 170) / 85.0f) * 255.0f;
       green = 255 - blue;
     }
 
@@ -257,7 +221,7 @@ void setup() {
 #endif /* ENABLE_SERIAL_PRINTS */
 
   preferences.begin("wifiCreds", true);
-  const String name = preferences.getString("alt-device-name", "OpenCO2 Mini");
+  String name = preferences.getString("alt-device-name", "OpenCO2 Mini");
   preferences.end();
   settingsBleService.setAltDeviceName(name.c_str());
   settingsBleService.registerWifiChangedCallback(onWifiChanged);
