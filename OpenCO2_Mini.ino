@@ -15,7 +15,7 @@ float humidity = 0.0f;
 uint16_t sensorStatus = 0;
 static int64_t lastMeasurementTimeMs = 0;
 
-#define FIRMWARE_VERSION "v1.4"
+#define FIRMWARE_VERSION "v1.5"
 
 #define BUTTON GPIO_NUM_0
 #define SCL GPIO_NUM_13
