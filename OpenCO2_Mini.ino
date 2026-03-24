@@ -122,7 +122,7 @@ void HandleRoot() {
 float calculateHumidityOffset(float temperature, float humidity) {
   float T2 = temperature + getTemperatureOffset();
   float m = 17.625f, Tn = 243.21f;
-  return humidity * exp(m * Tn * ((temperature - T2) / ((Tn + temperature) * (Tn + T2))));
+  return humidity * exp(m * Tn * ((temperature - T2) / ((Tn + temperature) * (Tn + T2)))) - 10.0;
 }
 
 void initOnce() {
