@@ -15,7 +15,7 @@ float humidity = 0.0f;
 uint16_t sensorStatus = 0;
 static int64_t lastMeasurementTimeMs = 0;
 
-#define FIRMWARE_VERSION "v1.5"
+#define FIRMWARE_VERSION "v1.6"
 
 #define BUTTON GPIO_NUM_0
 #define SCL GPIO_NUM_13
@@ -197,6 +197,32 @@ void setup() {
   }
 #endif /* ENABLE_SERIAL_PRINTS */
   delay(100);
+
+  uint16_t testResult = 0;
+  error = sensor.performSelfTest(testResult);
+  if (error) {
+    // Communication error -> Raspberry
+    pixels.setPixelColor(0, pixels.Color(255, 0, 125));
+    pixels.show();
+    esp_light_sleep_start();
+  }
+  if (testResult) {
+    if (testResult & (1 << 0)) {
+      // Supply voltage issue -> Magenta
+      pixels.setPixelColor(0, pixels.Color(255, 0, 255));
+    } else if (testResult & (1 << 4)) {
+      // SHT Sensor not connected -> Violet
+      pixels.setPixelColor(0, pixels.Color(125, 0, 255));
+    } else if (testResult & (1 << 5) || testResult & (1 << 6)) {
+      // Memory error -> Cyan
+      pixels.setPixelColor(0, pixels.Color(0, 255, 255));
+    } else {
+      // Unknown/debug bits -> White
+      pixels.setPixelColor(0, pixels.Color(255, 255, 255));
+    }
+    pixels.show();
+    esp_light_sleep_start();
+  }
 
   // Perform conditioning to ensure good performance
   error = sensor.performConditioning();
